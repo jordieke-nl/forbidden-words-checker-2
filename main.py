@@ -9,6 +9,11 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 CORS(app)
 
+# Health check endpoint
+@app.route("/", methods=["GET"])
+def health_check():
+    return jsonify({"status": "healthy", "service": "forbidden-words-checker"})
+
 # Forbidden words organized by category
 FORBIDDEN_WORDS = {
     "Assurance Wording": [
@@ -144,4 +149,6 @@ def parse_document():
             os.remove(file_path)
 
 if __name__ == "__main__":
-    app.run(debug=False) 
+    import os
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False) 
