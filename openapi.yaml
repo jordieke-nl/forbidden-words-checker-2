@@ -1,0 +1,109 @@
+openapi: 3.0.0
+info:
+  title: Forbidden Words Checker API
+  version: 1.0.0
+  description: API for checking pentest documents for forbidden words in compliance with advisory and tax document requirements.
+servers:
+  - url: https://forbidden-words-checker-2.onrender.com
+paths:
+  /:
+    get:
+      summary: Health check endpoint
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  service:
+                    type: string
+                    example: "forbidden-words-checker"
+  /api/parse-document:
+    post:
+      summary: Upload a PDF or DOCX file for forbidden words checking
+      operationId: parseDocument
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The pentest document to check (.pdf or .docx)
+      responses:
+        '200':
+          description: Successfully checked document
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "No forbidden words were detected in the uploaded document."
+                  - type: object
+                    properties:
+                      results:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            page_number:
+                              type: integer
+                              description: Page number where forbidden words were found
+                            section:
+                              type: string
+                              description: Section title where forbidden words were found
+                            matches:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  word:
+                                    type: string
+                                    description: The forbidden word found
+                                    example: "validate"
+                                  category:
+                                    type: string
+                                    description: Category of the forbidden word
+                                    example: "Assurance Wording"
+                                  context:
+                                    type: string
+                                    description: The sentence containing the forbidden word
+                                    example: "We validate that the findings are correct."
+                                  recommendation:
+                                    type: string
+                                    description: Suggestion for compliant rephrasing
+                                    example: "Consider using 'observed', 'noted', or 'identified' instead."
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Unsupported file type. Please upload a PDF or DOCX file."
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "An error occurred while processing the file." 
