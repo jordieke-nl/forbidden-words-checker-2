@@ -94,6 +94,15 @@ app.post('/check', async (req, res) => {
     console.log('Bestand ontvangen:', req.body.filename);
     console.log('Base64 lengte:', req.body.file.length);
 
+    // Valideer base64 string
+    if (req.body.file.length < 100) {
+      console.log('Base64 string te kort:', req.body.file);
+      return res.status(400).json({ 
+        message: 'Ongeldige base64 string. Het bestand is te klein of niet correct gecodeerd.',
+        details: 'De Custom GPT moet het bestand correct omzetten naar base64 voordat het wordt verstuurd.'
+      });
+    }
+
     // Check bestandstype
     const ext = path.extname(req.body.filename).toLowerCase();
     if (!['.pdf', '.docx'].includes(ext)) {
@@ -103,7 +112,26 @@ app.post('/check', async (req, res) => {
 
     // Sla het bestand tijdelijk op
     const tempPath = path.join('/tmp', Date.now() + ext);
-    const buffer = Buffer.from(req.body.file, 'base64');
+    let buffer;
+    try {
+      buffer = Buffer.from(req.body.file, 'base64');
+      console.log('Base64 decode succesvol');
+    } catch (e) {
+      console.error('Base64 decode error:', e);
+      return res.status(400).json({ 
+        message: 'Ongeldige base64 string',
+        details: 'De base64 string kon niet worden gedecodeerd. Controleer of het bestand correct is gecodeerd.'
+      });
+    }
+
+    if (buffer.length < 100) {
+      console.log('Decoded bestand te klein:', buffer.length, 'bytes');
+      return res.status(400).json({ 
+        message: 'Bestand te klein',
+        details: 'Het gedecodeerde bestand is te klein om een geldig document te zijn.'
+      });
+    }
+
     fs.writeFileSync(tempPath, buffer);
     console.log('Bestand opgeslagen als:', tempPath);
     console.log('Bestandsgrootte:', buffer.length, 'bytes');
@@ -164,7 +192,10 @@ app.post('/check', async (req, res) => {
     });
   } catch (err) {
     console.error('Server error:', err);
-    res.status(500).json({ message: 'Error processing document' });
+    res.status(500).json({ 
+      message: 'Error processing document',
+      details: err.message
+    });
   }
 });
 
