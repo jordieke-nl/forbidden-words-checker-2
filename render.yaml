@@ -1,21 +1,24 @@
 services:
   - type: web
-    name: forbidden-words-checker-2
-    env: python
-    buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
-      mkdir -p /tmp
-      chmod 777 /tmp
-    startCommand: gunicorn main:app --workers 2 --threads 4 --timeout 120 --log-level debug --access-logfile - --error-logfile -
+    name: forbidden-words-api
+    env: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.9.0
-      - key: PYTHONUNBUFFERED
-        value: "1"
-      - key: TMPDIR
-        value: "/tmp"
-      - key: FLASK_ENV
-        value: "production"
-    healthCheckPath: /
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: API_SECRET_KEY
+        generateValue: true
+      - key: MAX_FILE_SIZE
+        value: 10485760
+      - key: ALLOWED_ORIGINS
+        value: https://chat.openai.com,https://chatgpt.com
+      - key: BASE_URL
+        sync: false
+    healthCheckPath: /health
     autoDeploy: true 
