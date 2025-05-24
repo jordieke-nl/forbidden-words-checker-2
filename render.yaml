@@ -3,6 +3,7 @@ services:
     name: forbidden-words-checker-2
     env: python
     buildCommand: |
+      pip install --upgrade pip
       pip install -r requirements.txt
       mkdir -p /tmp
       chmod 777 /tmp

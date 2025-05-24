@@ -8,6 +8,7 @@ from werkzeug.utils import secure_filename
 import tempfile
 import traceback
 import base64
+import mimetypes
 
 # Configure logging
 logging.basicConfig(
@@ -149,6 +150,12 @@ def parse_docx(file_path):
         logger.error(f"Error parsing DOCX: {str(e)}\n{traceback.format_exc()}")
         raise
 
+def is_valid_file_type(filename):
+    """Check if the file is a valid PDF or DOCX file."""
+    allowed_extensions = {'.pdf', '.docx'}
+    file_ext = os.path.splitext(filename.lower())[1]
+    return file_ext in allowed_extensions
+
 @app.route('/api/parse-document', methods=['POST'])
 def parse_document():
     temp_file = None
@@ -167,7 +174,7 @@ def parse_document():
         file_content = data['file']
         filename = secure_filename(data['filename'])
         
-        if not filename.lower().endswith(('.pdf', '.docx')):
+        if not is_valid_file_type(filename):
             logger.error(f"Unsupported file type: {filename}")
             return jsonify({"error": "Unsupported file type. Please upload a PDF or DOCX file."}), 400
             
