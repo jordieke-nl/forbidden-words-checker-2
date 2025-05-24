@@ -2,12 +2,17 @@ actions:
   scanDocumentForForbiddenWords:
     auto_execute: true
     openapi:
+      action: scanDocumentForForbiddenWords
+      method: POST
+      url: https://forbidden-words-checker-2.onrender.com/check
       attachments:
         - name: file
           description: Het PDF of DOCX bestand uit de chat om te controleren
           required: true
           type: file
+          mediaType: application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document
     requestBody:
+      required: true
       content:
         multipart/form-data:
           schema:
