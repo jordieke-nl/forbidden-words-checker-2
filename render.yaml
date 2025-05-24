@@ -2,7 +2,6 @@ services:
   - type: web
     name: forbidden-words-api
     env: node
-    plan: starter
     buildCommand: npm install
     startCommand: npm start
     envVars:
@@ -19,6 +18,6 @@ services:
       - key: ALLOWED_ORIGINS
         value: https://chat.openai.com,https://chatgpt.com
       - key: BASE_URL
-        sync: false
-    healthCheckPath: /health
+        value: https://forbidden-words-checker-2.onrender.com
+    healthCheckPath: /api/health
     autoDeploy: true 
