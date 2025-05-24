@@ -41,4 +41,9 @@ coverage/
 
 # Temporary files
 tmp/
-temp/ 
+temp/
+
+venv/
+__pycache__/
+.streamlit/
+*.pyc 
