@@ -156,6 +156,22 @@ def is_valid_file_type(filename):
     file_ext = os.path.splitext(filename.lower())[1]
     return file_ext in allowed_extensions
 
+def safe_base64_decode(base64_string):
+    """Safely decode base64 string with proper padding."""
+    try:
+        # Remove any whitespace
+        base64_string = base64_string.strip()
+        
+        # Add padding if needed
+        padding = len(base64_string) % 4
+        if padding:
+            base64_string += '=' * (4 - padding)
+            
+        return base64.b64decode(base64_string)
+    except Exception as e:
+        logger.error(f"Base64 decode error: {str(e)}")
+        raise ValueError("Invalid base64 encoding")
+
 @app.route('/api/parse-document', methods=['POST'])
 def parse_document():
     temp_file = None
@@ -186,7 +202,7 @@ def parse_document():
         
         try:
             # Decode base64 and save to file
-            file_bytes = base64.b64decode(file_content)
+            file_bytes = safe_base64_decode(file_content)
             with open(temp_file, 'wb') as f:
                 f.write(file_bytes)
             logger.info(f"File saved to: {temp_file}")
@@ -206,6 +222,9 @@ def parse_document():
             logger.info(f"Returning {len(results)} results")
             return jsonify({"results": results})
             
+        except ValueError as e:
+            logger.error(f"Invalid file encoding: {str(e)}")
+            return jsonify({"error": "Invalid file encoding. Please ensure the file is properly encoded."}), 400
         except Exception as e:
             logger.error(f"Error processing file: {str(e)}\n{traceback.format_exc()}")
             return jsonify({"error": f"An error occurred while processing the file: {str(e)}"}), 500
