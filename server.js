@@ -4,6 +4,7 @@ const multer = require('multer');
 const cors = require('cors');
 const fs = require('fs');
 const pdf = require('pdf-parse');
+const mammoth = require('mammoth');
 const { OpenAI } = require('openai');
 
 const app = express();
@@ -31,8 +32,17 @@ app.post('/check', upload.single('file'), async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
   try {
     const buffer = fs.readFileSync(req.file.path);
-    const data = await pdf(buffer);
-    const text = data.text;
+    let text;
+    if (req.file.mimetype === "application/pdf") {
+      const data = await pdf(buffer);
+      text = data.text;
+    } else if (req.file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || req.file.originalname.toLowerCase().endsWith(".docx")) {
+      const result = await mammoth.extractRawText({ buffer });
+      text = result.value;
+    } else {
+      return res.status(400).json({ message: "Unsupported file type. Please upload PDF or DOCX." });
+    }
+
     const parts = text.split(/(\d+\.\d+\s+[^\n]+)/);
     const matches = [];
 
