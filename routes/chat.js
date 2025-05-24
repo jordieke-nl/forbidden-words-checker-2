@@ -5,6 +5,8 @@ const path = require('path');
 const fs = require('fs').promises;
 const { v4: uuidv4 } = require('uuid');
 const OpenAI = require('openai');
+const FormData = require('form-data');
+const fetch = require('node-fetch');
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
