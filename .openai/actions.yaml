@@ -1,6 +1,12 @@
 actions:
   scanDocumentForForbiddenWords:
     auto_execute: true
+    openapi:
+      attachments:
+        - name: file
+          description: Het PDF of DOCX bestand uit de chat om te controleren
+          required: true
+          type: file
     requestBody:
       content:
         multipart/form-data:
@@ -15,8 +21,35 @@ actions:
               - file
     responses:
       '200':
-        description: Succesvolle scan
+        description: Document succesvol gecontroleerd
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                  example: "Document gecontroleerd"
+                filename:
+                  type: string
+                  example: "document.pdf"
+                type:
+                  type: string
+                  enum: [PDF, DOCX]
+                matches:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      forbidden_word:
+                        type: string
+                      context:
+                        type: string
+                      recommendation:
+                        type: string
+                      explanation:
+                        type: string
       '400':
-        description: Bad request
+        description: Ongeldig verzoek
       '500':
-        description: Internal server error 
+        description: Server fout 

@@ -1,4 +1,4 @@
-openapi: 3.0.0
+openapi: 3.1.0
 info:
   title: Forbidden Words Checker API
   version: 1.0.0
@@ -34,7 +34,7 @@ paths:
     post:
       operationId: checkDocument
       summary: Controleer document op verboden woorden
-      description: Upload een PDF of DOCX bestand om te controleren op verboden woorden.
+      description: Upload een PDF of DOCX bestand om te controleren op verboden woorden. Het bestand kan worden geüpload via multipart/form-data of als base64-gecodeerde string in JSON.
       tags:
         - Documents
       requestBody:
@@ -50,6 +50,20 @@ paths:
                   description: Het PDF of DOCX bestand om te controleren
               required:
                 - file
+          application/json:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: base64
+                  description: Het PDF of DOCX bestand als base64-gecodeerde string
+                filename:
+                  type: string
+                  description: De originele bestandsnaam met extensie (.pdf of .docx)
+              required:
+                - file
+                - filename
       responses:
         '200':
           description: Document succesvol gecontroleerd
@@ -95,33 +109,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "Geen bestand geüpload"
-                  details:
-                    type: string
-                    example: "Upload een PDF of DOCX bestand"
-                required:
-                  - message
-                  - details
+                $ref: '#/components/schemas/Error'
         '500':
           description: Server fout
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "Fout bij verwerken document"
-                  details:
-                    type: string
-                    example: "Er is een fout opgetreden bij het verwerken van het bestand"
-                required:
-                  - message
-                  - details
+                $ref: '#/components/schemas/Error'
 
 components:
   schemas:
@@ -186,10 +180,10 @@ components:
       properties:
         message:
           type: string
-          example: "Invalid request"
+          example: "Ongeldig verzoek"
         details:
           type: string
-          example: "The file must be a valid PDF or DOCX document"
+          example: "Upload een PDF of DOCX bestand via multipart/form-data met veldnaam 'file' of via JSON met base64 en filename."
       required:
         - message
         - details 
