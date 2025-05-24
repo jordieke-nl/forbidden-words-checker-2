@@ -1,6 +1,5 @@
 require('dotenv').config();
 const express = require('express');
-const multer = require('multer');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
@@ -12,15 +11,23 @@ const app = express();
 // Enable CORS
 app.use(cors());
 
-// Configure multer voor bestandsupload
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: '/tmp',
-    filename: (req, file, cb) => {
-      cb(null, Date.now() + path.extname(file.originalname));
-    }
-  }),
-  limits: { fileSize: 25 * 1024 * 1024 } // 25MB
+// Parse JSON bodies
+app.use(express.json({ limit: '25mb' }));
+
+// Logging middleware
+app.use((req, res, next) => {
+  console.log('\n=== NIEUWE REQUEST ===');
+  console.log('Tijd:', new Date().toISOString());
+  console.log('Method:', req.method);
+  console.log('URL:', req.url);
+  console.log('Content-Type:', req.headers['content-type']);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  if (req.headers['content-type']?.includes('application/json')) {
+    console.log('Body keys:', Object.keys(req.body));
+    console.log('Filename:', req.body.filename);
+    console.log('File size:', req.body.file ? req.body.file.length : 0);
+  }
+  next();
 });
 
 // Laad verboden woorden
@@ -29,55 +36,144 @@ const forbidden = fs.readFileSync('forbidden.txt', 'utf8')
   .map(w => w.trim().toLowerCase())
   .filter(Boolean);
 
+console.log('Aantal verboden woorden geladen:', forbidden.length);
+
+// Split text into sections
+function splitIntoSections(text) {
+  // Split on common section markers
+  const sectionRegex = /(?:\n|\r\n?)(?:\d+\.\s*[A-Z][^\n\r]+|\n[A-Z][^\n\r]+(?:\n|$))/g;
+  const sections = [];
+  let match;
+  let lastIndex = 0;
+  let sectionNumber = 1;
+
+  while ((match = sectionRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      sections.push({
+        number: sectionNumber,
+        title: 'Introduction',
+        content: text.substring(lastIndex, match.index).trim()
+      });
+      sectionNumber++;
+    }
+    sections.push({
+      number: sectionNumber,
+      title: match[0].trim(),
+      content: text.substring(match.index + match[0].length, text.length).trim()
+    });
+    sectionNumber++;
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    sections.push({
+      number: sectionNumber,
+      title: 'Conclusion',
+      content: text.substring(lastIndex).trim()
+    });
+  }
+
+  return sections;
+}
+
 // Health check
 app.get('/health', (req, res) => res.send('OK'));
 
 // Check endpoint
-app.post('/check', upload.single('file'), async (req, res) => {
+app.post('/check', async (req, res) => {
+  console.log('\n=== CHECK ENDPOINT AANGEROEPEN ===');
+  console.log('Content-Type:', req.headers['content-type']);
+  
   try {
-    if (!req.file) {
+    // Check voor base64 bestand
+    if (!req.body.file || !req.body.filename) {
+      console.log('Geen bestand of filename in request');
       return res.status(400).json({ message: 'Geen bestand geüpload' });
     }
 
-    // Lees bestand
-    const buffer = fs.readFileSync(req.file.path);
-    let text;
+    console.log('Bestand ontvangen:', req.body.filename);
+    console.log('Base64 lengte:', req.body.file.length);
+
+    // Check bestandstype
+    const ext = path.extname(req.body.filename).toLowerCase();
+    if (!['.pdf', '.docx'].includes(ext)) {
+      console.log('Ongeldig bestandstype:', ext);
+      return res.status(400).json({ message: 'Alleen PDF en DOCX bestanden zijn toegestaan' });
+    }
+
+    // Sla het bestand tijdelijk op
+    const tempPath = path.join('/tmp', Date.now() + ext);
+    const buffer = Buffer.from(req.body.file, 'base64');
+    fs.writeFileSync(tempPath, buffer);
+    console.log('Bestand opgeslagen als:', tempPath);
+    console.log('Bestandsgrootte:', buffer.length, 'bytes');
 
     // Verwerk PDF of DOCX
-    if (req.file.mimetype === 'application/pdf') {
+    let text;
+    if (ext === '.pdf') {
+      console.log('PDF verwerken');
       const data = await pdf(buffer);
       text = data.text;
+      console.log('PDF tekst lengte:', text.length);
     } else {
+      console.log('DOCX verwerken');
       const result = await mammoth.extractRawText({ buffer });
       text = result.value;
+      console.log('DOCX tekst lengte:', text.length);
     }
 
-    // Zoek verboden woorden
+    // Split into sections
+    const sections = splitIntoSections(text);
+    console.log('Aantal secties gevonden:', sections.length);
+
+    // Zoek verboden woorden per sectie
     const matches = [];
-    forbidden.forEach(word => {
-      const regex = new RegExp(`\\b${word}\\b`, 'i');
-      let m;
-      while ((m = regex.exec(text)) !== null) {
-        const context = text.substring(Math.max(0, m.index - 50), Math.min(text.length, m.index + 50));
-        matches.push({
-          word: word,
-          context: context
-        });
-      }
+    sections.forEach(section => {
+      forbidden.forEach(word => {
+        const regex = new RegExp(`\\b${word}\\b`, 'i');
+        let m;
+        while ((m = regex.exec(section.content)) !== null) {
+          const context = section.content.substring(
+            Math.max(0, m.index - 50),
+            Math.min(section.content.length, m.index + 50)
+          );
+          matches.push({
+            section_number: section.number,
+            section_title: section.title,
+            forbidden_word: word,
+            context: context,
+            recommendation: `Consider replacing "${word}" with a more appropriate term.`,
+            explanation: `The word "${word}" is considered inappropriate in this context and should be avoided in professional documentation.`
+          });
+        }
+      });
     });
 
-    // Cleanup
-    fs.unlinkSync(req.file.path);
+    console.log('Aantal matches gevonden:', matches.length);
 
-    res.json({ matches });
+    // Verwijder het bestand weer
+    fs.unlinkSync(tempPath);
+    console.log('Bestand verwijderd:', tempPath);
+
+    res.json({ 
+      message: 'Document analysis complete',
+      filename: req.body.filename,
+      type: ext === '.pdf' ? 'PDF' : 'DOCX',
+      total_sections: sections.length,
+      matches: matches
+    });
   } catch (err) {
-    console.error(err);
-    if (req.file?.path) {
-      try { fs.unlinkSync(req.file.path); } catch (e) {}
-    }
-    res.status(500).json({ message: 'Fout bij verwerken bestand' });
+    console.error('Server error:', err);
+    res.status(500).json({ message: 'Error processing document' });
   }
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`Server draait op poort ${port}`)); 
+app.listen(port, () => {
+  console.log('\n=== SERVER GESTART ===');
+  console.log(`Port: ${port}`);
+  console.log('CORS: enabled');
+  console.log('Bestandslimiet: 25MB');
+  console.log('Upload directory: /tmp');
+  console.log('Toegestane bestandstypen: .pdf, .docx');
+}); 

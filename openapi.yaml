@@ -3,11 +3,14 @@ info:
   title: Forbidden Words Checker API
   version: 1.0.0
   description: |
-    API voor het controleren van verboden woorden in documenten.
-    Ondersteunt PDF en DOCX bestanden tot 25MB.
+    API for checking documents for forbidden words. Supports PDF and DOCX files up to 25MB.
+    The API accepts base64-encoded files and returns detailed analysis of forbidden words found,
+    including section numbers, titles, context, and recommendations.
   contact:
-    name: Jordi Eke
-    email: jordi@eke.nl
+    name: API Support
+    email: support@example.com
+  license:
+    name: MIT
 
 servers:
   - url: https://forbidden-words-checker-2.onrender.com
@@ -17,10 +20,13 @@ paths:
   /health:
     get:
       operationId: checkHealth
-      summary: Controleer de gezondheid van de API
+      summary: Check API health
+      description: Returns OK if the API is running
+      tags:
+        - Health
       responses:
         '200':
-          description: API is gezond en actief
+          description: API is healthy
           content:
             text/plain:
               schema:
@@ -30,54 +36,116 @@ paths:
   /check:
     post:
       operationId: checkDocument
-      summary: Controleer een document op verboden woorden
+      summary: Check document for forbidden words
+      description: |
+        Upload a document (PDF or DOCX) to check for forbidden words.
+        The document should be sent as a base64-encoded string in the request body.
+        The API will analyze the document, split it into sections, and check each section
+        for forbidden words. Returns detailed results including section numbers, titles,
+        context, and recommendations for improvement.
+      tags:
+        - Documents
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
               required:
                 - file
+                - filename
               properties:
                 file:
                   type: string
-                  format: binary
-                  description: PDF of DOCX bestand om te controleren (max 25MB)
+                  description: Base64-encoded file content
+                  example: "JVBERi0xLjcKJeLjz9MKNSAwIG9iago8PC9UeXBlL1hPYmplY3QvU3VidHlwZS9JbWFnZS9XaWR0aCAxMDAvSGVpZ2h0IDEwMC9MZW5ndGggMTUvQ29sb3JTcGFjZS9EZXZpY2VSR0IvQml0c1BlckNvbXBvbmVudCA4L0ZpbHRlci9EQ1REZWNvZGU+PnN0cmVhbQr/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAyADIDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
+                filename:
+                  type: string
+                  description: Name of the uploaded file
+                  example: "document.pdf"
       responses:
         '200':
-          description: Succesvolle controle
+          description: Document analysis complete
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  matches:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        word:
-                          type: string
-                          description: Het gevonden verboden woord
-                        context:
-                          type: string
-                          description: Context waarin het woord gevonden is
+                $ref: '#/components/schemas/AnalysisResult'
         '400':
-          description: Ongeldige aanvraag
+          description: Invalid request
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
+                $ref: '#/components/schemas/Error'
         '500':
-          description: Server fout
+          description: Server error
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string 
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    AnalysisResult:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Document analysis complete"
+        filename:
+          type: string
+          example: "document.pdf"
+        type:
+          type: string
+          enum: [PDF, DOCX]
+          example: "PDF"
+        total_sections:
+          type: integer
+          example: 5
+        matches:
+          type: array
+          items:
+            $ref: '#/components/schemas/Match'
+      required:
+        - message
+        - filename
+        - type
+        - total_sections
+        - matches
+
+    Match:
+      type: object
+      properties:
+        section_number:
+          type: integer
+          example: 2
+        section_title:
+          type: string
+          example: "Executive Summary"
+        forbidden_word:
+          type: string
+          example: "hack"
+        context:
+          type: string
+          example: "...the system was hacked by an unauthorized user..."
+        recommendation:
+          type: string
+          example: "Consider replacing 'hack' with 'compromised' or 'breached'."
+        explanation:
+          type: string
+          example: "The word 'hack' is considered inappropriate in this context and should be avoided in professional documentation."
+      required:
+        - section_number
+        - section_title
+        - forbidden_word
+        - context
+        - recommendation
+        - explanation
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Error processing document"
+      required:
+        - message 
