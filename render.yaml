@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: forbidden-words-checker
+    name: forbidden-words-checker-2
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: python main.py
