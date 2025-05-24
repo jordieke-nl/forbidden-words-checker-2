@@ -4,9 +4,11 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 const { v4: uuidv4 } = require('uuid');
-const { extractText } = require('../services/textExtractor');
-const { detectForbiddenWords } = require('../services/wordDetector');
-const logger = require('../utils/logger');
+const OpenAI = require('openai');
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -60,23 +62,42 @@ router.post('/', upload.single('file'), async (req, res) => {
 
     uploadedFilePath = req.file.path;
 
-    // Extract text from the uploaded file
-    const text = await extractText(uploadedFilePath);
-    
-    // Detect forbidden words
-    const result = await detectForbiddenWords(text);
+    // Create form data for the API request
+    const formData = new FormData();
+    formData.append('file', fs.createReadStream(uploadedFilePath));
 
-    // Prepare response for ChatGPT
-    const response = {
-      status: 'success',
-      document: req.file.originalname,
-      total_violations: result.violations.length,
-      violations: result.violations,
-      processing_time: result.processingTime,
-      baseUrl: process.env.BASE_URL || 'https://forbidden-words-checker-2.onrender.com'
-    };
+    // Make request to forbidden words checker API
+    const response = await fetch('https://forbidden-words-checker-2.onrender.com/api/webhook', {
+      method: 'POST',
+      body: formData
+    });
 
-    res.json(response);
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+
+    // Create ChatGPT completion with the result
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that analyzes documents for forbidden words."
+        },
+        {
+          role: "user",
+          content: `Please analyze this document for forbidden words: ${req.file.originalname}`
+        },
+        {
+          role: "assistant",
+          content: JSON.stringify(result)
+        }
+      ]
+    });
+
+    res.json(completion);
 
   } catch (error) {
     console.error('Error processing file:', error);

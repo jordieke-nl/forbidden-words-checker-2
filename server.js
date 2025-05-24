@@ -12,6 +12,7 @@ require('dotenv').config();
 const uploadRoutes = require('./routes/upload');
 const healthRoutes = require('./routes/health');
 const webhookRoutes = require('./routes/webhook');
+const chatRoutes = require('./routes/chat');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -19,6 +20,9 @@ const logger = require('./utils/logger');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Trust proxy configuration for X-Forwarded-For header
+app.set('trust proxy', 1);
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -34,11 +38,17 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting
+// Rate limiting with proper IP detection
 const limiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 100,
-  message: 'Too many requests from this IP'
+  message: 'Too many requests from this IP',
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  // Trust X-Forwarded-For header
+  keyGenerator: (req) => {
+    return req.ip; // This will now use the correct IP from X-Forwarded-For
+  }
 });
 app.use('/api/', limiter);
 
@@ -87,7 +97,8 @@ app.get('/', (req, res) => {
     endpoints: {
       upload: '/api/upload',
       health: '/api/health',
-      webhook: '/api/webhook'
+      webhook: '/api/webhook',
+      chat: '/api/chat'
     },
     baseUrl: 'https://forbidden-words-checker-2.onrender.com'
   });
@@ -145,6 +156,7 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
 app.use('/api/upload', uploadRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/webhook', webhookRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
