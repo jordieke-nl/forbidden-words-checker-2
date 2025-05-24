@@ -1,0 +1,99 @@
+openapi: 3.0.0
+info:
+  title: Forbidden Words Checker API
+  version: 1.0.0
+  description: API voor het controleren van verboden woorden in PDF en DOCX bestanden
+
+servers:
+  - url: https://forbidden-words-checker-2.onrender.com
+    description: Production server
+
+paths:
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Health check endpoint
+      description: Controleert of de server actief is
+      responses:
+        '200':
+          description: Server is actief
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "OK"
+
+  /check:
+    post:
+      operationId: checkFile
+      summary: Controleer bestand op verboden woorden
+      description: Upload een PDF of DOCX bestand om te controleren op verboden woorden
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF of DOCX bestand (max 25MB)
+      responses:
+        '200':
+          description: Succesvolle controle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchesResponse'
+        '400':
+          description: Ongeldige request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server fout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    Match:
+      type: object
+      properties:
+        section_number:
+          type: string
+          description: Nummer van de sectie waar het verboden woord is gevonden
+          example: "1.1"
+        section_title:
+          type: string
+          description: Titel van de sectie
+          example: "Inleiding"
+        word:
+          type: string
+          description: Het gevonden verboden woord
+          example: "hacken"
+        context:
+          type: string
+          description: De context waarin het woord voorkomt
+          example: "De hacker probeerde in te breken in het systeem."
+
+    MatchesResponse:
+      type: object
+      properties:
+        matches:
+          type: array
+          items:
+            $ref: '#/components/schemas/Match'
+          description: Lijst van gevonden verboden woorden
+
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Foutmelding
+          example: "Ongeldig bestandstype. Upload een PDF of DOCX bestand." 
