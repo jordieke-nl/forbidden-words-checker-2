@@ -5,14 +5,9 @@ info:
   description: |
     API voor het controleren van verboden woorden in documenten.
     Ondersteunt PDF en DOCX bestanden tot 25MB.
-    Splitst documenten in secties en zoekt naar verboden woorden.
-    Ondersteunt zowel multipart/form-data als base64 uploads.
   contact:
     name: Jordi Eke
     email: jordi@eke.nl
-  license:
-    name: MIT
-    url: https://opensource.org/licenses/MIT
 
 servers:
   - url: https://forbidden-words-checker-2.onrender.com
@@ -23,9 +18,6 @@ paths:
     get:
       operationId: checkHealth
       summary: Controleer de gezondheid van de API
-      description: Controleert of de API server actief is en correct functioneert
-      tags:
-        - Health
       responses:
         '200':
           description: API is gezond en actief
@@ -34,27 +26,11 @@ paths:
               schema:
                 type: string
                 example: OK
-        '500':
-          description: Server is niet beschikbaar
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
 
   /check:
     post:
       operationId: checkDocument
       summary: Controleer een document op verboden woorden
-      description: |
-        Upload een PDF of DOCX bestand om te controleren op verboden woorden.
-        Het bestand wordt in secties opgesplitst en gecontroleerd.
-        Resultaten bevatten de sectie, het verboden woord en de context.
-        
-        Ondersteunt twee upload methodes:
-        1. multipart/form-data met een bestand
-        2. application/json met base64-gecodeerd bestand
-      tags:
-        - Documents
       requestBody:
         required: true
         content:
@@ -68,132 +44,40 @@ paths:
                   type: string
                   format: binary
                   description: PDF of DOCX bestand om te controleren (max 25MB)
-          application/json:
-            schema:
-              type: object
-              required:
-                - file
-                - filename
-              properties:
-                file:
-                  type: string
-                  description: Base64-gecodeerd bestand
-                  example: "SGVsbG8gV29ybGQ="
-                filename:
-                  type: string
-                  description: Naam van het bestand met extensie
-                  example: "document.docx"
-                mimetype:
-                  type: string
-                  description: MIME type van het bestand (optioneel)
-                  example: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
       responses:
         '200':
           description: Succesvolle controle
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MatchesResponse'
-              example:
-                matches:
-                  - section_number: "1.1"
-                    section_title: "Inleiding"
-                    word: "hacken"
-                    context: "De hacker probeerde in te breken in het systeem."
-                  - section_number: "2.3"
-                    section_title: "Beveiligingsmaatregelen"
-                    word: "kraken"
-                    context: "Het systeem kan niet worden gekraakt door externe partijen."
+                type: object
+                properties:
+                  matches:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        word:
+                          type: string
+                          description: Het gevonden verboden woord
+                        context:
+                          type: string
+                          description: Context waarin het woord gevonden is
         '400':
           description: Ongeldige aanvraag
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                message: "Ongeldig bestandstype. Upload een PDF of DOCX bestand."
-        '413':
-          description: Bestand te groot
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                message: "Bestand is te groot. Maximum grootte is 25MB."
+                type: object
+                properties:
+                  message:
+                    type: string
         '500':
           description: Server fout
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                message: "Interne serverfout. Probeer het later opnieuw."
-
-components:
-  schemas:
-    Match:
-      type: object
-      description: Een gevonden verboden woord met context
-      properties:
-        section_number:
-          type: string
-          description: Nummer van de sectie waar het woord gevonden is
-          example: "1.1"
-          pattern: '^\d+\.\d+$'
-        section_title:
-          type: string
-          description: Titel van de sectie
-          example: "Inleiding"
-          minLength: 1
-        word:
-          type: string
-          description: Het gevonden verboden woord
-          example: "hacken"
-          minLength: 1
-        context:
-          type: string
-          description: Context waarin het woord gevonden is (volledige zin)
-          example: "De hacker probeerde in te breken in het systeem."
-          minLength: 1
-      required:
-        - section_number
-        - section_title
-        - word
-        - context
-      additionalProperties: false
-
-    MatchesResponse:
-      type: object
-      description: Response met alle gevonden verboden woorden
-      properties:
-        matches:
-          type: array
-          description: Lijst van gevonden verboden woorden
-          items:
-            $ref: '#/components/schemas/Match'
-          minItems: 0
-      required:
-        - matches
-      additionalProperties: false
-
-    Error:
-      type: object
-      description: Foutmelding van de API
-      properties:
-        message:
-          type: string
-          description: Beschrijving van de fout
-          example: "Ongeldig bestandstype. Upload een PDF of DOCX bestand."
-          minLength: 1
-      required:
-        - message
-      additionalProperties: false
-
-security:
-  - {}  # Geen beveiliging vereist
-
-tags:
-  - name: Health
-    description: Endpoints voor het controleren van de API status
-  - name: Documents
-    description: Endpoints voor het controleren van documenten 
+                type: object
+                properties:
+                  message:
+                    type: string 
