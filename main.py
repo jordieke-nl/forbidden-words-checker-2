@@ -5,9 +5,14 @@ from docx import Document
 import os
 import logging
 from werkzeug.utils import secure_filename
+import tempfile
+import traceback
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
@@ -64,6 +69,7 @@ def get_recommendation(word, category):
 
 def parse_pdf(file_path):
     try:
+        logger.info(f"Parsing PDF file: {file_path}")
         doc = fitz.open(file_path)
         results = []
         
@@ -95,13 +101,15 @@ def parse_pdf(file_path):
                         "matches": matches
                     })
         
+        logger.info(f"Found {len(results)} results in PDF")
         return results
     except Exception as e:
-        logger.error(f"Error parsing PDF: {str(e)}")
+        logger.error(f"Error parsing PDF: {str(e)}\n{traceback.format_exc()}")
         raise
 
 def parse_docx(file_path):
     try:
+        logger.info(f"Parsing DOCX file: {file_path}")
         doc = Document(file_path)
         results = []
         current_section = "Introduction"
@@ -134,52 +142,72 @@ def parse_docx(file_path):
                         "matches": matches
                     })
         
+        logger.info(f"Found {len(results)} results in DOCX")
         return results
     except Exception as e:
-        logger.error(f"Error parsing DOCX: {str(e)}")
+        logger.error(f"Error parsing DOCX: {str(e)}\n{traceback.format_exc()}")
         raise
 
 @app.route('/api/parse-document', methods=['POST'])
 def parse_document():
+    temp_file = None
     try:
+        logger.info("Received document parse request")
+        
         if 'file' not in request.files:
+            logger.error("No file in request")
             return jsonify({"error": "No file provided"}), 400
         
         file = request.files['file']
         if file.filename == '':
+            logger.error("Empty filename")
             return jsonify({"error": "No file selected"}), 400
         
-        # Secure the filename and create a temporary path
+        logger.info(f"Processing file: {file.filename}")
+        
+        # Create a temporary file with a proper extension
+        temp_dir = tempfile.gettempdir()
         filename = secure_filename(file.filename)
-        file_path = os.path.join('/tmp', filename)
-        file.save(file_path)
+        temp_file = os.path.join(temp_dir, filename)
         
         try:
+            file.save(temp_file)
+            logger.info(f"File saved to: {temp_file}")
+            
             # Process based on file type
             if filename.lower().endswith('.pdf'):
-                results = parse_pdf(file_path)
+                results = parse_pdf(temp_file)
             elif filename.lower().endswith('.docx'):
-                results = parse_docx(file_path)
+                results = parse_docx(temp_file)
             else:
+                logger.error(f"Unsupported file type: {filename}")
                 return jsonify({"error": "Unsupported file type. Please upload a PDF or DOCX file."}), 400
             
-            # Clean up the temporary file
-            os.remove(file_path)
-            
             if not results:
+                logger.info("No forbidden words found")
                 return jsonify({
                     "message": "No forbidden words were detected in the uploaded document."
                 })
             
+            logger.info(f"Returning {len(results)} results")
             return jsonify({"results": results})
             
         except Exception as e:
-            logger.error(f"Error processing file: {str(e)}")
+            logger.error(f"Error processing file: {str(e)}\n{traceback.format_exc()}")
             return jsonify({"error": f"An error occurred while processing the file: {str(e)}"}), 500
             
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
+        logger.error(f"Unexpected error: {str(e)}\n{traceback.format_exc()}")
         return jsonify({"error": "An unexpected error occurred"}), 500
+        
+    finally:
+        # Clean up the temporary file
+        if temp_file and os.path.exists(temp_file):
+            try:
+                os.remove(temp_file)
+                logger.info("Temporary file removed")
+            except Exception as e:
+                logger.error(f"Error removing temporary file: {str(e)}")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

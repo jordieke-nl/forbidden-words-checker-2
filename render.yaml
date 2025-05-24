@@ -2,12 +2,19 @@ services:
   - type: web
     name: forbidden-words-checker-2
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn main:app --workers 2 --threads 4 --timeout 120
+    buildCommand: |
+      pip install -r requirements.txt
+      mkdir -p /tmp
+      chmod 777 /tmp
+    startCommand: gunicorn main:app --workers 2 --threads 4 --timeout 120 --log-level debug --access-logfile - --error-logfile -
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
       - key: PYTHONUNBUFFERED
         value: "1"
+      - key: TMPDIR
+        value: "/tmp"
+      - key: FLASK_ENV
+        value: "production"
     healthCheckPath: /
     autoDeploy: true 
