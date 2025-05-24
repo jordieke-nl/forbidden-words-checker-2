@@ -6,7 +6,6 @@ const fs = require('fs');
 const path = require('path');
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
-const { OpenAI } = require('openai');
 
 const app = express();
 app.use(cors());
@@ -41,17 +40,6 @@ const upload = multer({
   }
 });
 
-// Check OpenAI API key
-if (!process.env.OPENAI_API_KEY) {
-  console.error('OPENAI_API_KEY environment variable is niet geconfigureerd');
-  process.exit(1);
-}
-
-const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY,
-  timeout: 30000 // 30 seconden timeout voor OpenAI API calls
-});
-
 // Load forbidden words once
 const forbidden = fs.readFileSync('forbidden.txt', 'utf8')
   .split(/\r?\n/)
@@ -63,10 +51,6 @@ app.get('/health', (req, res) => {
   res.send('OK');
 });
 
-/**
- * POST /check
- * multipart/form-data: file (PDF)
- */
 app.post('/check', upload.single('file'), async (req, res) => {
   if (!req.file) {
     console.error('Geen bestand geüpload');
@@ -119,16 +103,9 @@ app.post('/check', upload.single('file'), async (req, res) => {
       });
     }
 
-    if (!text || text.trim().length === 0) {
-      console.error('No text content extracted from file');
-      return res.status(400).json({ 
-        message: 'No text content could be extracted from the file.'
-      });
-    }
-
     // Split into sections
     const parts = text.split(/(\d+\.\d+\s+[^\n]+)/);
-    const rawMatches = [];
+    const matches = [];
     for (let i = 1; i < parts.length; i += 2) {
       const [secNum, ...titleParts] = parts[i].trim().split(' ');
       const secTitle = titleParts.join(' ');
@@ -139,48 +116,14 @@ app.post('/check', upload.single('file'), async (req, res) => {
         while ((m = regex.exec(secText)) !== null) {
           const sentMatch = secText.match(new RegExp(`([^.]*\\b${word}\\b[^.]*\\.)`, 'i'));
           const context = sentMatch ? sentMatch[1].trim() : secText.substr(m.index, 100);
-          rawMatches.push({ page: null, section_number: secNum, section_title: secTitle, word, context });
+          matches.push({
+            section_number: secNum,
+            section_title: secTitle,
+            word: word,
+            context: context
+          });
         }
       });
-    }
-
-    // Enrich with GPT advice
-    const detailed = [];
-    for (const m of rawMatches) {
-      try {
-        const prompt = `
-In dit fragment komt het verboden woord "${m.word}" voor:
-"${m.context}"
-Leg kort uit waarom dit fout is en geef een verbeterde formulering.
-`;
-        const resp = await openai.chat.completions.create({
-          model: 'gpt-4',
-          messages: [{ role: 'user', content: prompt }],
-          max_tokens: 150
-        });
-        const lines = resp.choices[0].message.content.trim().split(/\r?\n/);
-        detailed.push({
-          page: m.page,
-          section_number: m.section_number,
-          section_title: m.section_title,
-          word: m.word,
-          context: m.context,
-          explanation: lines[0] || '',
-          suggestion: lines.slice(-1)[0] || ''
-        });
-      } catch (gptError) {
-        console.error('Fout bij OpenAI API call:', gptError);
-        // Continue processing other matches even if one fails
-        detailed.push({
-          page: m.page,
-          section_number: m.section_number,
-          section_title: m.section_title,
-          word: m.word,
-          context: m.context,
-          explanation: 'Fout bij ophalen AI suggestie',
-          suggestion: 'Controleer handmatig'
-        });
-      }
     }
 
     // Clean up uploaded file
@@ -190,7 +133,7 @@ Leg kort uit waarom dit fout is en geef een verbeterde formulering.
       console.error('Fout bij opruimen bestand:', cleanupError);
     }
 
-    return res.json({ matches: detailed });
+    return res.json({ matches: matches });
   } catch (err) {
     console.error('Server fout:', err);
     // Clean up file in case of error
