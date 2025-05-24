@@ -7,6 +7,7 @@ import logging
 from werkzeug.utils import secure_filename
 import tempfile
 import traceback
+import base64
 
 # Configure logging
 logging.basicConfig(
@@ -154,34 +155,40 @@ def parse_document():
     try:
         logger.info("Received document parse request")
         
-        if 'file' not in request.files:
-            logger.error("No file in request")
-            return jsonify({"error": "No file provided"}), 400
+        if not request.is_json:
+            logger.error("Request is not JSON")
+            return jsonify({"error": "Request must be JSON"}), 400
+            
+        data = request.get_json()
+        if not data or 'file' not in data or 'filename' not in data:
+            logger.error("Missing file or filename in request")
+            return jsonify({"error": "Missing file or filename in request"}), 400
+            
+        file_content = data['file']
+        filename = secure_filename(data['filename'])
         
-        file = request.files['file']
-        if file.filename == '':
-            logger.error("Empty filename")
-            return jsonify({"error": "No file selected"}), 400
+        if not filename.lower().endswith(('.pdf', '.docx')):
+            logger.error(f"Unsupported file type: {filename}")
+            return jsonify({"error": "Unsupported file type. Please upload a PDF or DOCX file."}), 400
+            
+        logger.info(f"Processing file: {filename}")
         
-        logger.info(f"Processing file: {file.filename}")
-        
-        # Create a temporary file with a proper extension
+        # Create a temporary file
         temp_dir = tempfile.gettempdir()
-        filename = secure_filename(file.filename)
         temp_file = os.path.join(temp_dir, filename)
         
         try:
-            file.save(temp_file)
+            # Decode base64 and save to file
+            file_bytes = base64.b64decode(file_content)
+            with open(temp_file, 'wb') as f:
+                f.write(file_bytes)
             logger.info(f"File saved to: {temp_file}")
             
             # Process based on file type
             if filename.lower().endswith('.pdf'):
                 results = parse_pdf(temp_file)
-            elif filename.lower().endswith('.docx'):
+            else:  # .docx
                 results = parse_docx(temp_file)
-            else:
-                logger.error(f"Unsupported file type: {filename}")
-                return jsonify({"error": "Unsupported file type. Please upload a PDF or DOCX file."}), 400
             
             if not results:
                 logger.info("No forbidden words found")

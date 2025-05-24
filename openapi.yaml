@@ -29,19 +29,24 @@ paths:
     post:
       operationId: parseDocument
       summary: Upload a document for forbidden words checking
+      description: Upload a PDF or DOCX file to check for forbidden words in compliance with advisory and tax document requirements.
       requestBody:
         required: true
         content:
-          multipart/form-data:
+          application/json:
             schema:
               type: object
               properties:
                 file:
                   type: string
                   format: binary
-                  description: The document to check (.pdf or .docx)
+                  description: Base64 encoded document content
+                filename:
+                  type: string
+                  description: Name of the file including extension
               required:
                 - file
+                - filename
       responses:
         '200':
           description: Successfully checked document
