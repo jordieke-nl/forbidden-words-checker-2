@@ -168,7 +168,7 @@ app.post('/check', async (req, res) => {
   }
 });
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 10000;
 app.listen(port, () => {
   console.log('\n=== SERVER GESTART ===');
   console.log(`Port: ${port}`);
