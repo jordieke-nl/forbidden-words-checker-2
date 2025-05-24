@@ -1,60 +1,18 @@
+schema: 1.0
 actions:
   scanDocumentForForbiddenWords:
     auto_execute: true
-    openapi:
-      action: scanDocumentForForbiddenWords
-      method: POST
-      url: https://forbidden-words-checker-2.onrender.com/check
-      attachments:
-        - name: file
-          description: Het PDF of DOCX bestand uit de chat om te controleren
-          required: true
-          type: file
-          mediaType: application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document
-    requestBody:
-      required: true
-      content:
-        multipart/form-data:
-          schema:
-            type: object
-            properties:
-              file:
-                type: string
-                format: binary
-                description: Het PDF of DOCX bestand om te controleren
-            required:
-              - file
-    responses:
-      '200':
-        description: Document succesvol gecontroleerd
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                message:
-                  type: string
-                  example: "Document gecontroleerd"
-                filename:
-                  type: string
-                  example: "document.pdf"
-                type:
-                  type: string
-                  enum: [PDF, DOCX]
-                matches:
-                  type: array
-                  items:
-                    type: object
-                    properties:
-                      forbidden_word:
-                        type: string
-                      context:
-                        type: string
-                      recommendation:
-                        type: string
-                      explanation:
-                        type: string
-      '400':
-        description: Ongeldig verzoek
-      '500':
-        description: Server fout 
+    operation: check
+    method: POST
+    url: https://forbidden-words-checker-2.onrender.com/check
+    accepts:
+      - application/pdf
+      - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+    parameters:
+      - name: file
+        type: file
+        required: true
+        description: Het PDF of DOCX bestand om te controleren
+    returns:
+      type: json
+      description: Resultaten van de documentanalyse 
