@@ -3,9 +3,11 @@ services:
     name: forbidden-words-checker-2
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: python main.py
+    startCommand: gunicorn main:app --workers 2 --threads 4 --timeout 120
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
+      - key: PYTHONUNBUFFERED
+        value: "1"
     healthCheckPath: /
     autoDeploy: true 
