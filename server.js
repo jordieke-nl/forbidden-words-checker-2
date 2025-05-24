@@ -6,15 +6,19 @@ const path = require('path');
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 const multer = require('multer');
+const os = require('os');
 
 const app = express();
 
 // Enable CORS
 app.use(cors());
 
+// Parse JSON bodies
+app.use(express.json({ limit: '25mb' }));
+
 // Configure multer for file uploads
 const upload = multer({
-  dest: '/tmp/',
+  dest: os.tmpdir(),
   limits: {
     fileSize: 25 * 1024 * 1024 // 25MB
   },
@@ -34,6 +38,10 @@ app.use((req, res, next) => {
   console.log('Method:', req.method);
   console.log('URL:', req.url);
   console.log('Content-Type:', req.headers['content-type']);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  if (req.headers['content-type']?.includes('application/json')) {
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+  }
   next();
 });
 
@@ -54,21 +62,56 @@ app.post('/check', upload.single('file'), async (req, res) => {
   console.log('Content-Type:', req.headers['content-type']);
   
   try {
-    // Check voor bestand
-    if (!req.file) {
+    let buffer, filename;
+
+    if (req.file) {
+      // Multipart form-data upload
+      console.log('Multipart upload ontvangen');
+      buffer = fs.readFileSync(req.file.path);
+      filename = req.file.originalname;
+      console.log('Bestand ontvangen:', filename);
+      console.log('Bestandsgrootte:', buffer.length, 'bytes');
+    } else if (req.body.file && req.body.filename) {
+      // JSON upload met base64
+      console.log('JSON upload ontvangen');
+      try {
+        let base64Data = req.body.file;
+        // Verwijder data URL prefix als die er is
+        if (base64Data.startsWith('data:')) {
+          base64Data = base64Data.split(',')[1];
+        }
+        buffer = Buffer.from(base64Data, 'base64');
+        filename = req.body.filename;
+        console.log('Bestand ontvangen:', filename);
+        console.log('Bestandsgrootte:', buffer.length, 'bytes');
+      } catch (e) {
+        console.error('Base64 decode error:', e);
+        return res.status(400).json({
+          message: 'Ongeldig bestand',
+          details: 'Het bestand kon niet worden gedecodeerd. Controleer of het correct is gecodeerd.'
+        });
+      }
+    } else {
       console.log('Geen bestand ontvangen');
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Geen bestand geüpload',
-        details: 'Upload een PDF of DOCX bestand via multipart/form-data met veldnaam "file".'
+        details: 'Upload een PDF of DOCX bestand via multipart/form-data met veldnaam "file" of via JSON met base64 en filename.'
       });
     }
 
-    console.log('Bestand ontvangen:', req.file.originalname);
-    console.log('Bestandsgrootte:', req.file.size, 'bytes');
+    // Check bestandstype
+    const ext = path.extname(filename).toLowerCase();
+    if (!['.pdf', '.docx'].includes(ext)) {
+      console.log('Ongeldig bestandstype:', ext);
+      return res.status(400).json({
+        message: 'Ongeldig bestandstype',
+        details: 'Alleen PDF en DOCX bestanden zijn toegestaan.'
+      });
+    }
 
-    // Lees het bestand
-    const buffer = fs.readFileSync(req.file.path);
-    const ext = path.extname(req.file.originalname).toLowerCase();
+    // Sla het bestand tijdelijk op voor verwerking
+    const tempPath = path.join(os.tmpdir(), Date.now() + ext);
+    fs.writeFileSync(tempPath, buffer);
 
     // Verwerk PDF of DOCX
     let text;
@@ -101,21 +144,29 @@ app.post('/check', upload.single('file'), async (req, res) => {
 
     console.log('Aantal matches gevonden:', matches.length);
 
-    // Verwijder het bestand
-    fs.unlinkSync(req.file.path);
+    // Verwijder het tijdelijke bestand
+    try {
+      fs.unlinkSync(tempPath);
+      if (req.file?.path) {
+        fs.unlinkSync(req.file.path);
+      }
+    } catch (e) {
+      console.error('Fout bij verwijderen tijdelijk bestand:', e);
+    }
 
-    res.json({ 
+    res.json({
       message: 'Document gecontroleerd',
-      filename: req.file.originalname,
+      filename: filename,
       type: ext === '.pdf' ? 'PDF' : 'DOCX',
       matches: matches
     });
   } catch (err) {
     console.error('Server error:', err);
+    // Probeer tijdelijke bestanden op te ruimen
     if (req.file?.path) {
       try { fs.unlinkSync(req.file.path); } catch (e) {}
     }
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Fout bij verwerken document',
       details: err.message
     });
