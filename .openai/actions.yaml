@@ -1,0 +1,22 @@
+actions:
+  scanDocumentForForbiddenWords:
+    auto_execute: true
+    requestBody:
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              file:
+                type: string
+                format: binary
+                description: Het PDF of DOCX bestand om te controleren
+            required:
+              - file
+    responses:
+      '200':
+        description: Succesvolle scan
+      '400':
+        description: Bad request
+      '500':
+        description: Internal server error 

@@ -1,14 +1,11 @@
-openapi: 3.1.0
+openapi: 3.0.0
 info:
   title: Forbidden Words Checker API
   version: 1.0.0
-  description: |
-    API for checking documents for forbidden words. Supports PDF and DOCX files up to 25MB.
-    The API accepts base64-encoded files and returns detailed analysis of forbidden words found,
-    including section numbers, titles, context, and recommendations.
+  description: API voor het controleren van documenten op verboden woorden. Ondersteunt PDF en DOCX bestanden tot 25MB.
   contact:
-    name: API Support
-    email: support@example.com
+    name: Jordi Eke
+    email: jordi.eke@example.com
   license:
     name: MIT
 
@@ -19,14 +16,14 @@ servers:
 paths:
   /health:
     get:
-      operationId: checkHealth
-      summary: Check API health
-      description: Returns OK if the API is running
+      operationId: healthCheck
+      summary: Health check endpoint
+      description: Returns OK if the server is running
       tags:
         - Health
       responses:
         '200':
-          description: API is healthy
+          description: Server is healthy
           content:
             text/plain:
               schema:
@@ -36,52 +33,95 @@ paths:
   /check:
     post:
       operationId: checkDocument
-      summary: Check document for forbidden words
-      description: |
-        Upload a document (PDF or DOCX) to check for forbidden words.
-        The document should be sent as a base64-encoded string in the request body.
-        The API will analyze the document, split it into sections, and check each section
-        for forbidden words. Returns detailed results including section numbers, titles,
-        context, and recommendations for improvement.
+      summary: Controleer document op verboden woorden
+      description: Upload een PDF of DOCX bestand om te controleren op verboden woorden.
       tags:
         - Documents
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
               type: object
-              required:
-                - file
-                - filename
               properties:
                 file:
                   type: string
-                  description: Base64-encoded file content
-                  example: "JVBERi0xLjcKJeLjz9MKNSAwIG9iago8PC9UeXBlL1hPYmplY3QvU3VidHlwZS9JbWFnZS9XaWR0aCAxMDAvSGVpZ2h0IDEwMC9MZW5ndGggMTUvQ29sb3JTcGFjZS9EZXZpY2VSR0IvQml0c1BlckNvbXBvbmVudCA4L0ZpbHRlci9EQ1REZWNvZGU+PnN0cmVhbQr/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAyADIDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k="
-                filename:
-                  type: string
-                  description: Name of the uploaded file
-                  example: "document.pdf"
+                  format: binary
+                  description: Het PDF of DOCX bestand om te controleren
+              required:
+                - file
       responses:
         '200':
-          description: Document analysis complete
+          description: Document succesvol gecontroleerd
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AnalysisResult'
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Document gecontroleerd"
+                  filename:
+                    type: string
+                    example: "document.pdf"
+                  type:
+                    type: string
+                    enum: [PDF, DOCX]
+                    example: "PDF"
+                  matches:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        forbidden_word:
+                          type: string
+                          example: "verboden"
+                        context:
+                          type: string
+                          example: "...dit is een verboden woord in de tekst..."
+                        recommendation:
+                          type: string
+                          example: "Vervang 'verboden' door een geschikter woord."
+                        explanation:
+                          type: string
+                          example: "Het woord 'verboden' is niet toegestaan in deze context."
+                required:
+                  - message
+                  - filename
+                  - type
+                  - matches
         '400':
-          description: Invalid request
+          description: Ongeldig verzoek
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Geen bestand geüpload"
+                  details:
+                    type: string
+                    example: "Upload een PDF of DOCX bestand"
+                required:
+                  - message
+                  - details
         '500':
-          description: Server error
+          description: Server fout
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Fout bij verwerken document"
+                  details:
+                    type: string
+                    example: "Er is een fout opgetreden bij het verwerken van het bestand"
+                required:
+                  - message
+                  - details
 
 components:
   schemas:
@@ -117,22 +157,22 @@ components:
       properties:
         section_number:
           type: integer
-          example: 2
+          example: 1
         section_title:
           type: string
-          example: "Executive Summary"
+          example: "Introduction"
         forbidden_word:
           type: string
-          example: "hack"
+          example: "example"
         context:
           type: string
-          example: "...the system was hacked by an unauthorized user..."
+          example: "This is an example document that contains forbidden words."
         recommendation:
           type: string
-          example: "Consider replacing 'hack' with 'compromised' or 'breached'."
+          example: "Consider replacing 'example' with a more appropriate term."
         explanation:
           type: string
-          example: "The word 'hack' is considered inappropriate in this context and should be avoided in professional documentation."
+          example: "The word 'example' is considered inappropriate in this context and should be avoided in professional documentation."
       required:
         - section_number
         - section_title
@@ -146,6 +186,10 @@ components:
       properties:
         message:
           type: string
-          example: "Error processing document"
+          example: "Invalid request"
+        details:
+          type: string
+          example: "The file must be a valid PDF or DOCX document"
       required:
-        - message 
+        - message
+        - details 
